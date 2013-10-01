@@ -1,0 +1,104 @@
+/*
+  ThArFe - Thermo-electric Arduino Fermentation control
+  
+  A simple Arduino controller for a thermo-electric peltier device to
+  heat and cool a thermally protected environment containing a 
+  fermentation container.  Current design to fit one 23L glass carboy.
+  
+  Hardware
+  Arduino Uno compatabile board (Freetronics Eleven R3 V2.0)
+  OneWire Temperature probe DS18820
+  15V 6A Peltier
+  *15V 6A Power supply
+  *230V PC Power Supply
+  2 x Heatsinks
+  2 x Fans
+  *2 x MOSFET
+  *2 x DPDT Relays
+  1 x Red LED - indicate heating cycle
+  *1 x Blue LED - indicate cooling cycle
+  *Thermally protected Fermentation Chamber
+  *need to aquire
+    
+*/
+
+#include <OneWire.h>								//http://www.pjrc.com/teensy/td_libs_OneWire.html
+#include <DallasTemperature.h>      //https://github.com/milesburton/Arduino-Temperature-Control-Library/blob/master/DallasTemperature.h
+
+float TmpC;									        //open variable for Current Temperature
+float TmpTH = 25;								    //set variable for target temperature - high range
+float TmpTL = 23;								    //set variable for target temperature - low range
+
+int cool = 13;									    //define pin 13 - represents cooling circuit
+int heat = 12;									    //define pin 12 - represents heating circuit
+
+#define ONE_WIRE_BUS 2							//ds18820 to pin2
+OneWire oneWire(ONE_WIRE_BUS);			//start onewire instance for device communication
+DallasTemperature sensors(&oneWire);	//send onewire reference to dallas temp library
+
+void setup()
+{
+Serial.begin(38400);								//init output to serial monitor
+sensors.begin();								    //startup onewire library
+pinMode (cool, OUTPUT);							//sets the led pin 13 up as an output to cooling circuit
+pinMode (heat, OUTPUT);							//sets the led pin 12 up as an output to heating circuit
+}
+
+void loop()
+{
+
+	readtemp();								        //read temp from DS18820
+	reporttemp();								      //report temperature to serial monitor
+	cooling();								        //check targetTemp and turn on cooling circuit
+	heating();								        //check targetTemp and turn on heating circuit
+	idle();									          //check targetTemp is within range and turn off heat and cool pins
+
+}
+
+void readtemp()
+{
+	sensors.requestTemperatures();						//call for temperature
+	TmpC = (sensors.getTempCByIndex(0));			//set var TmpC to sensor reading in Celsius
+}
+
+void reporttemp()
+{
+	Serial.print("Temp: ");
+	Serial.print(TmpC);
+	Serial.println("C");
+}
+
+void cooling()
+{
+	if (TmpC > TmpTH)
+	{
+        digitalWrite (heat, LOW);           //ensure heating circuit is off
+        delay(500);
+	digitalWrite (cool, HIGH);				        //turns on cooling circuit
+        Serial.print("COOLING ");
+        delay(1000);
+	}
+}
+
+void heating()
+{
+	if (TmpC < TmpTL)
+	{
+      digitalWrite (cool, LOW);             //ensure cooling circuit is off
+      delay(500);
+			digitalWrite (heat, HIGH);				    //turns on heating circuit
+			Serial.print("HEATING ");
+			delay(1000);
+	}
+}
+
+void idle()
+{
+	if (TmpC > TmpTL && TmpC < TmpTH)
+	{
+			digitalWrite (cool, LOW);				      //turns off cooling circuit
+			digitalWrite (heat, LOW);				      //turns off heating circuit
+			Serial.print("IDLE ");
+			delay(1000);
+	}
+}
